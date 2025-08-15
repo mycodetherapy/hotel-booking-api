@@ -1,11 +1,12 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 
 import { CreateUserDto } from './dto/create-user.dto';
 import { UsersService } from './user.service';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) {
+  }
 
   @Post()
   async create(@Body() createUserDto: CreateUserDto) {
@@ -33,7 +34,7 @@ export class UsersController {
       offset: Number(offset),
       email,
       name,
-      contactPhone
+      contactPhone,
     });
   }
 }
