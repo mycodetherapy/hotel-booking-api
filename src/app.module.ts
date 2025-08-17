@@ -1,9 +1,11 @@
-import { Module } from '@nestjs/common';
+import { ClassSerializerInterceptor, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UsersModule } from './users/users.module';
 import { HotelsModule } from './hotels/hotels.module';
 import { AuthModule } from './auth/auth.module';
+import { ReservationsModule } from './reservations/reservations.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -18,6 +20,13 @@ import { AuthModule } from './auth/auth.module';
     UsersModule,
     AuthModule,
     HotelsModule,
+    ReservationsModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ClassSerializerInterceptor,
+    },
   ],
 })
 export class AppModule {
