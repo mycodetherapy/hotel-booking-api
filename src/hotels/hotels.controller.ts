@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, Post, Put, Query, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { HotelsService } from './hotels.service';
 import { HotelRoomsService } from './hotel-rooms.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
@@ -10,6 +21,11 @@ import { type SearchHotelParams } from './interfaces/search-hotel-params.interfa
 import { type SearchRoomsParams } from './interfaces/search-rooms-params.interface';
 import { UpdateHotelParams } from './interfaces/update-hotel-params.interface';
 import { Types } from 'mongoose';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../users/decorators/roles.decorator';
+import { Public } from '../users/decorators/public.decorator';
+
 
 @Controller('hotels')
 export class HotelsController {
@@ -20,21 +36,27 @@ export class HotelsController {
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   async create(@Body() createHotelDto: CreateHotelDto) {
     return this.hotelsService.create(createHotelDto);
   }
 
+  @Public()
   @Get()
   async search(@Query() params: SearchHotelParams) {
     return this.hotelsService.search(params);
   }
 
+  @Public()
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.hotelsService.findById(id);
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   async update(
     @Param('id') id: string,
     @Body() updateHotelDto: UpdateHotelDto,
@@ -52,8 +74,9 @@ export class HotelsController {
     return this.hotelsService.update(id, updateParams);
   }
 
-
   @Post(':id/rooms')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @UseInterceptors(FilesInterceptor('images'))
   async createRoom(
     @Param('id') hotelId: string,
@@ -68,7 +91,7 @@ export class HotelsController {
     });
   }
 
-
+  @Public()
   @Get(':id/rooms')
   async searchRooms(
     @Param('id') hotelId: string,
@@ -81,6 +104,8 @@ export class HotelsController {
   }
 
   @Put('rooms/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @UseInterceptors(FilesInterceptor('images'))
   async updateRoom(
     @Param('id') id: string,
