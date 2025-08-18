@@ -18,7 +18,7 @@ export class HotelRoomsService implements HotelRoomService {
 
 
   async create(data: Partial<HotelRoom>): Promise<HotelRoom> {
-    const hotel = await this.hotelModel.findById(data.hotel).exec();
+    const hotel = await this.hotelModel.findById(data.hotel).lean().exec();
     if (!hotel) {
       throw new NotFoundException('Hotel not found');
     }
@@ -35,6 +35,7 @@ export class HotelRoomsService implements HotelRoomService {
     return this.hotelRoomModel
       .findById(id)
       .populate('hotel')
+      .lean()
       .exec();
   }
 
@@ -54,6 +55,7 @@ export class HotelRoomsService implements HotelRoomService {
       .skip(offset)
       .limit(limit)
       .populate('hotel', 'title description')
+      .lean()
       .exec();
   }
 
@@ -61,6 +63,7 @@ export class HotelRoomsService implements HotelRoomService {
     return this.hotelRoomModel
       .findByIdAndUpdate(id, data, { new: true })
       .populate('hotel')
+      .lean()
       .exec();
   }
 }

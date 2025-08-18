@@ -21,10 +21,12 @@ import { type SearchHotelParams } from './interfaces/search-hotel-params.interfa
 import { type SearchRoomsParams } from './interfaces/search-rooms-params.interface';
 import { UpdateHotelParams } from './interfaces/update-hotel-params.interface';
 import { Types } from 'mongoose';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../users/decorators/roles.decorator';
 import { Public } from '../users/decorators/public.decorator';
+import { AuthenticatedGuard } from '../auth/session.serializer';
+import { plainToInstance } from 'class-transformer';
+import { HotelResponseDto } from './dto/hotel-response.dto';
 
 
 @Controller('hotels')
@@ -36,10 +38,17 @@ export class HotelsController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles('admin')
   async create(@Body() createHotelDto: CreateHotelDto) {
-    return this.hotelsService.create(createHotelDto);
+    const hotel = await this.hotelsService.create(createHotelDto);
+    return plainToInstance(HotelResponseDto, {
+      id: hotel._id.toString(),
+      title: hotel.title,
+      description: hotel.description,
+      createdAt: hotel.createdAt,
+      updatedAt: hotel.updatedAt,
+    });
   }
 
   @Public()
@@ -55,7 +64,7 @@ export class HotelsController {
   }
 
   @Put(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles('admin')
   async update(
     @Param('id') id: string,
@@ -75,7 +84,7 @@ export class HotelsController {
   }
 
   @Post(':id/rooms')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles('admin')
   @UseInterceptors(FilesInterceptor('images'))
   async createRoom(
@@ -104,7 +113,7 @@ export class HotelsController {
   }
 
   @Put('rooms/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles('admin')
   @UseInterceptors(FilesInterceptor('images'))
   async updateRoom(

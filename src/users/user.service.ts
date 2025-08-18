@@ -8,14 +8,17 @@ import { SearchUserParams } from './interfaces/search-user-params.interface';
 
 @Injectable()
 export class UsersService implements IUserService {
-  constructor(@InjectModel(User.name) private UserModel: Model<UserDocument>) {}
+  constructor(@InjectModel(User.name) private UserModel: Model<UserDocument>) {
+  }
 
-  async create(data: Partial<User>): Promise<User> {
-    if (!data.passwordHash) {
+  async create(data: Partial<User & { password?: string }>): Promise<User> {
+    const password = data.password || data.passwordHash;
+    if (!password) {
       throw new Error('Password is required');
     }
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(data.passwordHash, salt);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
     const user = new this.UserModel({
       ...data,
       passwordHash: hashedPassword,
@@ -48,6 +51,7 @@ export class UsersService implements IUserService {
     return this.UserModel.find(query)
       .skip(offset)
       .limit(limit)
+      .select('-passwordHash')
       .exec();
   }
 }

@@ -1,36 +1,46 @@
-import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
-import { AuthService } from './auth.service';
+import {
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Request,
+  Session,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
 import { LocalAuthGuard } from './guards/local-auth.guard';
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
-import { UsersService } from '../users/user.service';
 import { Public } from '../users/decorators/public.decorator';
+import { AuthenticatedGuard } from './session.serializer';
+
 
 @Controller('auth')
 export class AuthController {
-  constructor(
-    private authService: AuthService,
-    private usersService: UsersService,
-  ) {
-  }
-
   @Public()
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  async login(@Body() loginDto: LoginDto, @Request() req) {
-    return this.authService.login(req.user);
+  @HttpCode(HttpStatus.OK)
+  async login(@Request() req) {
+    return new Promise((resolve, reject) => {
+      req.login(req.user, (err) => {
+        if (err) {
+          return reject(new UnauthorizedException());
+        }
+        const { passwordHash, ...result } = req.user;
+        resolve(result);
+      });
+    });
   }
 
-  @Public()
-  @Post('register')
-  async register(@Body() registerDto: RegisterDto) {
-    const user = await this.usersService.create({
-      ...registerDto,
-      passwordHash: registerDto.password,
-      role: 'client',
+  @UseGuards(AuthenticatedGuard)
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  logout(@Request() req, @Session() session: Record<string, any>) {
+    req.logout((err) => {
+      if (err) {
+        throw new UnauthorizedException('Could not log out.');
+      }
     });
-    const userObj = user['toObject'] ? user['toObject']() : user;
-    const { passwordHash, ...result } = userObj;
-    return result;
+    session.destroy(null);
+    return {};
   }
 }
