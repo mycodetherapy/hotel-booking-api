@@ -6,6 +6,7 @@ import { HotelsModule } from './hotels/hotels.module';
 import { AuthModule } from './auth/auth.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
+import { SupportRequestModule } from './support/support-request.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
     AuthModule,
     HotelsModule,
     ReservationsModule,
+    SupportRequestModule,
   ],
   providers: [
     {
