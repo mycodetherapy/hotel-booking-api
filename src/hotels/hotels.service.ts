@@ -23,7 +23,7 @@ export class HotelsService implements IHotelService {
     return this.hotelModel.findById(id).lean().exec();
   }
 
-  async search(params: SearchHotelParams): Promise<Hotel[]> {
+  async search(params: SearchHotelParams): Promise<HotelDocument[]> {
     const { limit, offset, title } = params;
     const query = {
       title: { $regex: new RegExp(title, 'i') },
@@ -35,7 +35,7 @@ export class HotelsService implements IHotelService {
       .exec();
   }
 
-  async update(id: string, data: UpdateHotelParams): Promise<Hotel | null> {
+  async update(id: string, data: UpdateHotelParams): Promise<HotelDocument | null> {
     return this.hotelModel
       .findByIdAndUpdate(id, data, { new: true })
       .lean()

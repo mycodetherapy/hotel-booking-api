@@ -6,6 +6,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -20,7 +21,6 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { type SearchHotelParams } from './interfaces/search-hotel-params.interface';
 import { type SearchRoomsParams } from './interfaces/search-rooms-params.interface';
 import { UpdateHotelParams } from './interfaces/update-hotel-params.interface';
-import { Types } from 'mongoose';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../users/decorators/roles.decorator';
 import { Public } from '../users/decorators/public.decorator';
@@ -29,7 +29,7 @@ import { plainToInstance } from 'class-transformer';
 import { HotelResponseDto } from './dto/hotel-response.dto';
 
 
-@Controller('hotels')
+@Controller()
 export class HotelsController {
   constructor(
     private readonly hotelsService: HotelsService,
@@ -37,7 +37,7 @@ export class HotelsController {
   ) {
   }
 
-  @Post()
+  @Post('admin/hotels')
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles('admin')
   async create(@Body() createHotelDto: CreateHotelDto) {
@@ -46,30 +46,29 @@ export class HotelsController {
       id: hotel._id.toString(),
       title: hotel.title,
       description: hotel.description,
-      createdAt: hotel.createdAt,
-      updatedAt: hotel.updatedAt,
     });
   }
 
-  @Public()
-  @Get()
+  @Get('admin/hotels')
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles('admin')
   async search(@Query() params: SearchHotelParams) {
-    return this.hotelsService.search(params);
+    const hotels = await this.hotelsService.search(params);
+    return hotels.map(hotel => ({
+      id: hotel._id.toString(),
+      title: hotel.title,
+      description: hotel.description,
+    }));
   }
 
-  @Public()
-  @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.hotelsService.findById(id);
-  }
-
-  @Put(':id')
+  @Put('admin/hotels/:id')
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles('admin')
   async update(
     @Param('id') id: string,
     @Body() updateHotelDto: UpdateHotelDto,
   ) {
+    const hotel = await this.hotelsService.update(id, updateHotelDto);
     const updateParams: UpdateHotelParams = {};
 
     if (updateHotelDto.title !== undefined) {
@@ -80,39 +79,74 @@ export class HotelsController {
       updateParams.description = updateHotelDto.description;
     }
 
-    return this.hotelsService.update(id, updateParams);
+    return {
+      id: hotel?._id.toString(),
+      title: updateHotelDto.title,
+      description: updateHotelDto.description,
+    };
   }
 
-  @Post(':id/rooms')
+  @Public()
+  @Get('common/hotel-rooms')
+  async searchRooms(@Query() params: SearchRoomsParams, @Req() req) {
+    if (!req.user || req.user.role === 'client') {
+      params.isEnabled = true;
+    }
+    const rooms = await this.hotelRoomsService.search(params);
+    return rooms.map(room => ({
+      id: room._id.toString(),
+      description: room.description,
+      images: room.images,
+      hotel: {
+        id: room.hotel._id.toString(),
+        title: room.hotel.title,
+      },
+    }));
+  }
+
+  @Public()
+  @Get('common/hotel-rooms/:id')
+  async findRoom(@Param('id') id: string) {
+    const room = await this.hotelRoomsService.findById(id);
+    return {
+      id: room._id.toString(),
+      description: room.description,
+      images: room.images,
+      hotel: {
+        id: room.hotel._id.toString(),
+        title: room.hotel.title,
+        description: room.hotel.description,
+      },
+    };
+  }
+
+  @Post('admin/hotel-rooms')
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles('admin')
   @UseInterceptors(FilesInterceptor('images'))
   async createRoom(
-    @Param('id') hotelId: string,
     @Body() createRoomDto: CreateHotelRoomDto,
     @UploadedFiles() images: Array<Express.Multer.File>,
   ) {
-    const imagePaths = images?.map((file) => file.path) || [];
-    return this.hotelRoomsService.create({
+    const imagePaths = images?.map(file => file.path) || [];
+    const room = await this.hotelRoomsService.create({
       ...createRoomDto,
-      hotel: new Types.ObjectId(hotelId),
       images: imagePaths,
     });
+    return {
+      id: room._id.toString(),
+      description: room.description,
+      images: room.images,
+      isEnabled: room.isEnabled,
+      hotel: {
+        id: room.hotel._id.toString(),
+        title: room.hotel.title,
+        description: room.hotel.description,
+      },
+    };
   }
 
-  @Public()
-  @Get(':id/rooms')
-  async searchRooms(
-    @Param('id') hotelId: string,
-    @Query() params: Omit<SearchRoomsParams, 'hotel'>,
-  ) {
-    return this.hotelRoomsService.search({
-      ...params,
-      hotel: hotelId,
-    });
-  }
-
-  @Put('rooms/:id')
+  @Put('admin/hotel-rooms/:id')
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles('admin')
   @UseInterceptors(FilesInterceptor('images'))
@@ -122,12 +156,20 @@ export class HotelsController {
     @UploadedFiles() images: Array<Express.Multer.File>,
   ) {
     const updateData: any = { ...updateRoomDto };
-    if (images && images.length) {
-      updateData.images = images.map((file) => file.path);
+    if (images?.length) {
+      updateData.images = images.map(file => file.path);
     }
-    if (updateRoomDto.hotelId) {
-      updateData.hotel = new Types.ObjectId(updateRoomDto.hotelId);
-    }
-    return this.hotelRoomsService.update(id, updateData);
+    const room = await this.hotelRoomsService.update(id, updateData);
+    return {
+      id: room?._id.toString(),
+      description: room?.description,
+      images: room?.images,
+      isEnabled: room?.isEnabled,
+      hotel: {
+        id: room?.hotel._id.toString(),
+        title: room?.hotel.title,
+        description: room?.hotel.description,
+      },
+    };
   }
 }
