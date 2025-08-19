@@ -1,9 +1,16 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Reservation } from './schemas/reservation.schema';
 import { HotelRoomsService } from '../hotels/hotel-rooms.service';
 import { ID } from '../types';
+import { ReservationResponseDto } from './dto/reservation-response.dto';
 
 @Injectable()
 export class ReservationsService {
@@ -14,7 +21,7 @@ export class ReservationsService {
   ) {
   }
 
-  async addReservation(userId: ID, roomId: ID, startDate: Date, endDate: Date) {
+  async addReservation(userId: ID, roomId: ID, startDate: Date, endDate: Date): Promise<ReservationResponseDto> {
     const room = await this.hotelRoomsService.findById(roomId.toString());
     if (!room || !room.isEnabled) {
       throw new BadRequestException('Room not found or disabled');
@@ -33,13 +40,40 @@ export class ReservationsService {
       dateEnd: endDate,
     });
 
-    await reservation.save();
-    return this.formatReservationResponse(reservation, room);
+    const saved = await reservation.save();
+
+    const populated = await this.reservationModel
+      .findById(saved._id)
+      .populate([
+        { path: 'roomId', select: 'description images' },
+        { path: 'hotelId', select: 'title description' },
+      ])
+      .lean();
+
+    if (!populated) {
+      throw new NotFoundException('Reservation not found after saving');
+    }
+
+    const response: ReservationResponseDto = {
+      startDate: populated.dateStart,
+      endDate: populated.dateEnd,
+      hotelRoom: {
+        description: (populated.roomId as any)?.description,
+        images: (populated.roomId as any)?.images,
+      },
+      hotel: {
+        title: (populated.hotelId as any)?.title,
+        description: (populated.hotelId as any)?.description,
+      },
+    };
+
+    return response;
   }
 
   async getReservations(userId: ID) {
+    const id = typeof userId === 'string' ? new Types.ObjectId(userId) : userId;
     const reservations = await this.reservationModel
-      .find({ userId })
+      .find({ userId: id })
       .populate('roomId')
       .populate('hotelId')
       .exec();
@@ -47,37 +81,20 @@ export class ReservationsService {
     return reservations.map(res => this.formatReservationResponse(res));
   }
 
-  async getManagerReservations(userId?: ID) {
-    const filter = userId ? { userId } : {};
-    const reservations = await this.reservationModel
-      .find(filter)
-      .populate('roomId')
-      .populate('hotelId')
-      .exec();
+  async removeReservation(reservationId: string, userId?: string | Types.ObjectId) {
+    const reservation = await this.reservationModel.findById(reservationId).exec();
 
-    return reservations.map(res => this.formatReservationResponse(res));
-  }
-
-  async removeReservation(id: ID, userId: ID) {
-    const reservation = await this.reservationModel.findById(id).exec();
     if (!reservation) {
       throw new NotFoundException('Reservation not found');
     }
 
-    if (reservation.userId.toString() !== userId.toString()) {
-      throw new BadRequestException('Cannot delete another user reservation');
+    if (userId && !reservation.userId.equals(typeof userId === 'string' ? new Types.ObjectId(userId) : userId)) {
+      throw new ForbiddenException('You do not have permission to cancel this reservation'); // 403
     }
 
-    await this.reservationModel.findByIdAndDelete(id).exec();
-  }
+    await this.reservationModel.deleteOne({ _id: reservationId }).exec();
 
-  async removeReservationByManager(id: ID) {
-    const reservation = await this.reservationModel.findById(id).exec();
-    if (!reservation) {
-      throw new NotFoundException('Reservation not found');
-    }
-
-    await this.reservationModel.findByIdAndDelete(id).exec();
+    return { success: true };
   }
 
   private async isRoomAvailable(roomId: ID, startDate: Date, endDate: Date): Promise<boolean> {
