@@ -25,8 +25,8 @@ export class AuthController {
         if (err) {
           return reject(new UnauthorizedException());
         }
-        const { passwordHash, ...result } = req.user;
-        resolve(result);
+        const { email, name, contactPhone } = req.user;
+        resolve({ email, name, contactPhone });
       });
     });
   }

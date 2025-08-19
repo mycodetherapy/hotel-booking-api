@@ -1,46 +1,51 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UsersService } from './user.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
+import { AuthenticatedGuard } from '../auth/session.serializer';
+import type { SearchUserParams } from './interfaces/search-user-params.interface';
 
-@Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
+@Controller()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {
   }
 
-  @Post()
+  @Post('client/register')
+  async register(@Body() dto: CreateUserDto) {
+    const user = await this.usersService.create(dto);
+    return {
+      id: user._id.toString(),
+      email: user.email,
+      name: user.name,
+    };
+  }
+
+  @Post('admin/users')
+  @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles('admin')
-  async create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create({
-      ...createUserDto,
-      passwordHash: createUserDto.password,
-    });
+  async createUser(@Body() dto: CreateUserDto) {
+    const user = await this.usersService.create({ ...dto, role: dto['role'] });
+    return {
+      id: user._id.toString(),
+      email: user.email,
+      name: user.name,
+      contactPhone: user.contactPhone,
+      role: user.role,
+    };
   }
 
-  @Get(':id')
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Get(['admin/users', 'manager/users'])
   @Roles('admin', 'manager')
-  async findOne(@Param('id') id: string) {
-    return this.usersService.findById(id);
-  }
-
-  @Get()
-  @Roles('admin', 'manager')
-  async findAll(
-    @Query('limit') limit = 10,
-    @Query('offset') offset = 0,
-    @Query('email') email = '',
-    @Query('name') name = '',
-    @Query('contactPhone') contactPhone = '',
-  ) {
-    return this.usersService.findAll({
-      limit: Number(limit),
-      offset: Number(offset),
-      email,
-      name,
-      contactPhone,
-    });
+  async getUsers(@Query() query: SearchUserParams) {
+    const users = await this.usersService.findAll(query);
+    return users.map((u) => ({
+      id: u._id.toString(),
+      email: u.email,
+      name: u.name,
+      contactPhone: u.contactPhone,
+    }));
   }
 }
