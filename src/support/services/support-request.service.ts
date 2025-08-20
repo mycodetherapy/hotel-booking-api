@@ -40,7 +40,6 @@ export class SupportRequestService implements ISupportRequestService {
     sr.messages.push(message);
     await sr.save();
 
-    // 6. Оповещения через EventEmitter
     this.events.emit('supportRequest.newMessage', { supportRequest: sr, message });
 
     return message;
@@ -48,7 +47,9 @@ export class SupportRequestService implements ISupportRequestService {
 
   async getMessages(supportRequest: string): Promise<Message[]> {
     const sr = await this.getByIdOrFail(supportRequest);
-    return sr.messages.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    return sr.messages.sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+    );
   }
 
   subscribe(handler: (supportRequest: SupportRequest, message: Message) => void): () => void {

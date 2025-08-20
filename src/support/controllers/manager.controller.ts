@@ -11,8 +11,7 @@ import { AuthenticatedGuard } from '../../auth/session.serializer';
 // import { UsersService } from '../../users/users.service';
 
 @Controller('manager/support-requests')
-@UseGuards(AuthenticatedGuard, RolesGuard)
-@Roles('manager')
+
 export class ManagerSupportRequestsController {
   constructor(
     private readonly supportSrv: SupportRequestService,
@@ -22,6 +21,8 @@ export class ManagerSupportRequestsController {
 
   // 2.5.3 Список обращений для менеджера
   @Get('/')
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles('manager')
   async list(@Query() query: ListQueryDto) {
     const isActive = typeof query.isActive === 'string' ? query.isActive === 'true' : undefined;
     const items = await this.supportSrv.findSupportRequests({ user: null, isActive });

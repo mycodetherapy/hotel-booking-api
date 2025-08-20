@@ -9,31 +9,35 @@ export class SupportRequestEmployeeService implements ISupportRequestEmployeeSer
   constructor(@InjectModel(SupportRequest.name) private readonly srModel: Model<SupportRequestDocument>) {
   }
 
-  // 4. employee.markMessagesAsRead — помечаем сообщения, которые были отправлены пользователем (клиентом)
   async markMessagesAsRead(params: MarkMessagesAsReadDto): Promise<void> {
-    const sr = await this.srModel.findById(params.supportRequest);
+    const sr = await this.srModel.findById(params.supportRequest, 'user').lean();
     if (!sr) return;
 
     const before = new Date(params.createdBefore);
 
-    sr.messages.forEach((m) => {
-      const isFromClient = String(m.author) === String(sr.user);
-      if (!m.readAt && isFromClient && m.createdAt <= before) {
-        m.readAt = new Date();
-      }
-    });
-
-    await sr.save();
+    await this.srModel.updateOne(
+      { _id: params.supportRequest },
+      {
+        $set: {
+          'messages.$[m].readAt': new Date(),
+        },
+      },
+      {
+        arrayFilters: [{
+          'm.readAt': null,
+          'm.createdAt': { $lte: before },
+          'm.author': { $eq: sr.user },
+        }],
+      },
+    ).exec();
   }
 
-  // 3. employee.getUnreadCount — считаем сообщения от пользователя без readAt
   async getUnreadCount(supportRequest: string): Promise<number> {
     const sr = await this.srModel.findById(supportRequest).lean();
     if (!sr) return 0;
     return sr.messages.filter((m) => !m.readAt && String(m.author) === String(sr.user)).length;
   }
-
-  // 5. closeRequest — isActive = false
+  
   async closeRequest(supportRequest: string): Promise<void> {
     await this.srModel.findByIdAndUpdate(supportRequest, { $set: { isActive: false } }).exec();
   }

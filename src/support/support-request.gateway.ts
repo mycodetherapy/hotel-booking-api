@@ -22,9 +22,10 @@ export class SupportRequestGateway implements OnGatewayInit {
   afterInit() {
     // подписываем gateway на эвенты сервиса
     this.supportSrv.subscribe((sr, message) => {
+
+      console.log('message', message, 'sr', sr);
       const payload = {
         id: String(message._id),
-        createdAt: message.createdAt,
         text: message.text,
         readAt: message.readAt,
         author: {

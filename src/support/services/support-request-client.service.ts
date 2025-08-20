@@ -14,7 +14,7 @@ export class SupportRequestClientService implements ISupportRequestClientService
   }
 
   async createSupportRequest(data: CreateSupportRequestDto): Promise<SupportRequest> {
-    const sr = new this.srModel({
+    const srData = {
       user: new Types.ObjectId(data.user),
       createdAt: new Date(),
       isActive: true,
@@ -27,29 +27,34 @@ export class SupportRequestClientService implements ISupportRequestClientService
           readAt: null,
         },
       ],
-    });
-    return sr.save();
+    };
+
+    return this.srModel.create(srData);
   }
 
-  // 2. client.markMessagesAsRead — помечаем сообщения, которые НЕ от пользователя (т.е. от сотрудников)
   async markMessagesAsRead(params: MarkMessagesAsReadDto): Promise<void> {
-    const sr = await this.srModel.findById(params.supportRequest);
+    const sr = await this.srModel.findById(params.supportRequest, 'user').lean();
     if (!sr) return;
 
     const before = new Date(params.createdBefore);
-    const userId = String(params.user);
 
-    sr.messages.forEach((m) => {
-      const isFromEmployee = String(m.author) !== String(sr.user);
-      if (!m.readAt && isFromEmployee && m.createdAt <= before) {
-        m.readAt = new Date();
-      }
-    });
-
-    await sr.save();
+    await this.srModel.updateOne(
+      { _id: params.supportRequest },
+      {
+        $set: {
+          'messages.$[m].readAt': new Date(),
+        },
+      },
+      {
+        arrayFilters: [{
+          'm.readAt': null,
+          'm.createdAt': { $lte: before },
+          'm.author': { $ne: new Types.ObjectId(params.user) },
+        }],
+      },
+    ).exec();
   }
 
-  // 1. client.getUnreadCount — считаем сообщения от сотрудников без readAt
   async getUnreadCount(supportRequest: string): Promise<number> {
     const sr = await this.srModel.findById(supportRequest).lean();
     if (!sr) return 0;
