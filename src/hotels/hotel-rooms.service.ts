@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { HotelRoom } from './schemas/hotel-room.schema';
 import { HotelRoomService } from './interfaces/hotel-room-service.interface';
 import { SearchRoomsParams } from './interfaces/search-rooms-params.interface';
@@ -30,7 +30,18 @@ export class HotelRoomsService implements HotelRoomService {
       isEnabled: data.isEnabled !== undefined ? data.isEnabled : true,
     });
 
-    return room.save();
+    const savedRoom = await room.save();
+
+    const populatedRoom = await this.hotelRoomModel
+      .findById(savedRoom._id)
+      .populate('hotel', 'title description')
+      .exec();
+
+    if (!populatedRoom) {
+      throw new NotFoundException('Room not found after creation');
+    }
+
+    return populatedRoom;
   }
 
   async findById(id: string) {
@@ -46,18 +57,27 @@ export class HotelRoomsService implements HotelRoomService {
   }
 
   async search(params: SearchRoomsParams) {
-    const query: any = { hotel: params.hotel.toString() };
+
+    const query: any = {};
+
+    if (params.hotel) {
+      query.hotel = new Types.ObjectId(params.hotel);
+    }
+
     if (params.isEnabled !== undefined) {
       query.isEnabled = params.isEnabled;
     }
 
-    return this.hotelRoomModel
+    const result = await this.hotelRoomModel
       .find(query)
       .skip(params.offset || 0)
       .limit(params.limit || 10)
-      .populate('hotel')
+      .populate('hotel', 'title')
       .lean()
       .exec();
+
+    console.log('Found rooms:', result.length);
+    return result;
   }
 
   async update(id: string, data: Partial<HotelRoom>) {
