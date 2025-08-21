@@ -24,7 +24,7 @@ export class SupportRequestGateway implements OnGatewayInit {
         text: message.text,
         readAt: message.readAt,
         author: {
-          id: String(message.author),
+          id: String(message.author._id),
           name: (message.author as any)?.name || '',
         },
       };
