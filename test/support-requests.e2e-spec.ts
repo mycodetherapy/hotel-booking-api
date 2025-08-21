@@ -4,11 +4,17 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { TestAuthGuard, TestManagerAuthGuard } from './test-auth.guard';
 import { SupportRequestService } from '../src/support/services/support-request.service';
-
+import { getModelToken } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { SupportRequest } from '../src/support/schemas/support-request.schema';
 
 describe('SupportRequest Final Test', () => {
   let app: INestApplication;
   let createdRequestId: string;
+  let supportRequestModel: Model<SupportRequest>;
+
+  const TEST_USER_ID = new Types.ObjectId('111111111111111111111111');
+  const TEST_MANAGER_ID = new Types.ObjectId('222222222222222222222222');
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -16,12 +22,21 @@ describe('SupportRequest Final Test', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    supportRequestModel = app.get<Model<SupportRequest>>(getModelToken(SupportRequest.name));
+
     app.setGlobalPrefix('api');
     app.useGlobalGuards(new TestAuthGuard());
     await app.init();
   });
 
   afterAll(async () => {
+    await supportRequestModel.deleteMany({
+      $or: [
+        { user: { $in: [TEST_USER_ID, TEST_MANAGER_ID] } },
+        { 'messages.author': { $in: [TEST_USER_ID, TEST_MANAGER_ID] } },
+      ],
+    }).exec();
+
     await app.close();
   });
 
@@ -33,7 +48,6 @@ describe('SupportRequest Final Test', () => {
     expect(response.status).toBe(201);
     expect(response.body).toBeInstanceOf(Array);
     expect(response.body[0]).toHaveProperty('id');
-
     createdRequestId = response.body[0].id;
   });
 
@@ -44,20 +58,17 @@ describe('SupportRequest Final Test', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toBeInstanceOf(Array);
-
     const foundRequest = response.body.find(req => req.id === createdRequestId);
     expect(foundRequest).toBeDefined();
   });
 
   it('should test manager endpoints with manager guard', async () => {
     app.useGlobalGuards(new TestManagerAuthGuard());
-
     const response = await request(app.getHttpServer())
       .get('/api/manager/support-requests')
       .query({ isActive: 'true' });
 
     expect([200, 403]).toContain(response.status);
-
     app.useGlobalGuards(new TestAuthGuard());
   });
 

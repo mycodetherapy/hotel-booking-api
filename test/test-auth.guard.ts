@@ -34,23 +34,3 @@ export class TestManagerAuthGuard implements CanActivate {
     return true;
   }
 }
-
-
-// import { CanActivate, ExecutionContext } from '@nestjs/common';
-// import { Types } from 'mongoose';
-//
-// export class TestAuthGuard implements CanActivate {
-//   canActivate(context: ExecutionContext): boolean {
-//     const request = context.switchToHttp().getRequest();
-//
-//     // Простой фиксированный user для тестов
-//     request.user = {
-//       _id: new Types.ObjectId('68a6229cfddf50e592d7506c'),
-//       id: '68a6229cfddf50e592d7506c',
-//       role: 'client',
-//       email: 'test@example.com',
-//     };
-//
-//     return true;
-//   }
-// }
