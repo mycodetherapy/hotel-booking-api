@@ -1,14 +1,15 @@
-type UserLite = { _id: string; name: string; email?: string; contactPhone?: string };
+export function mapMessage(m: any) {
+  const authorData = m.author && typeof m.author === 'object' ? m.author : null;
 
-export function mapMessage(m: any, author?: UserLite) {
   return {
     id: String(m._id ?? m.id),
     createdAt: m.createdAt?.toISOString?.() ?? m.createdAt ?? null,
     text: m.text ?? '',
     readAt: m.readAt ? (m.readAt.toISOString?.() ?? m.readAt) : null,
-    author: author
-      ? { id: String(author._id), name: author.name }
-      : { id: String(m.author), name: '' },
+    author: {
+      id: authorData ? String(authorData._id) : String(m.author),
+      name: authorData?.name ?? '',
+    },
   };
 }
 
@@ -33,24 +34,19 @@ export function mapChatForClientList(sr: any, clientId: string) {
   };
 }
 
-export function mapChatForManagerList(sr: any, client?: UserLite) {
+export function mapChatForManagerList(sr: any) {
+  const userData = sr.user && typeof sr.user === 'object' ? sr.user : null;
+
   return {
     id: String(sr._id),
     createdAt: sr.createdAt?.toISOString?.() ?? sr.createdAt ?? null,
     isActive: !!sr.isActive,
     hasNewMessages: hasNewMessagesForEmployee(sr),
-    client: client
-      ? {
-        id: String(client._id),
-        name: client.name,
-        email: client.email ?? '',
-        contactPhone: client.contactPhone ?? '',
-      }
-      : {
-        id: String(sr.user),
-        name: '',
-        email: '',
-        contactPhone: '',
-      },
+    client: {
+      id: String(userData?._id ?? sr.user),
+      name: userData?.name ?? '',
+      email: userData?.email ?? '',
+      contactPhone: userData?.contactPhone ?? '',
+    },
   };
 }

@@ -20,8 +20,22 @@ export class SupportRequestService implements ISupportRequestService {
       filter.user = new Types.ObjectId(params.user);
     }
     if (typeof params.isActive === 'boolean') filter.isActive = params.isActive;
-    return this.srModel.find(filter).sort({ createdAt: -1 }).exec();
+
+    return this.srModel
+      .find(filter)
+      .populate('user', 'name email contactPhone')
+      .sort({ createdAt: -1 })
+      .exec();
   }
+
+  // async findSupportRequests(params: GetChatListParams): Promise<SupportRequest[]> {
+  //   const filter: any = {};
+  //   if (params.user) {
+  //     filter.user = new Types.ObjectId(params.user);
+  //   }
+  //   if (typeof params.isActive === 'boolean') filter.isActive = params.isActive;
+  //   return this.srModel.find(filter).sort({ createdAt: -1 }).exec();
+  // }
 
   async getByIdOrFail(id: string): Promise<SupportRequestDocument> {
     const doc = await this.srModel.findById(id);
@@ -42,16 +56,42 @@ export class SupportRequestService implements ISupportRequestService {
     sr.messages.push(message);
     await sr.save();
 
-    this.events.emit('supportRequest.newMessage', { supportRequest: sr, message });
+    const populatedSr = await this.srModel
+      .findById(data.supportRequest)
+      .populate({
+        path: 'messages.author',
+        select: 'name',
+        model: 'User',
+      })
+      .exec();
 
-    return message;
+    const populatedMessage = populatedSr?.messages.find(m =>
+      String(m._id) === String(message._id),
+    );
+
+    this.events.emit('supportRequest.newMessage', {
+      supportRequest: sr,
+      message: populatedMessage || message,
+    });
+
+    return populatedMessage || message;
   }
 
-  async getMessages(supportRequest: string): Promise<Message[]> {
-    const sr = await this.getByIdOrFail(supportRequest);
-    return sr.messages.sort(
-      (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
-    );
+  async getMessages(supportRequest: string) {
+    const sr = await this.srModel
+      .findById(supportRequest)
+      .populate({
+        path: 'messages.author',
+        select: 'name',
+        model: 'User',
+      })
+      .lean()
+      .exec();
+
+    if (!sr) throw new NotFoundException('Support request not found');
+
+    return sr.messages
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }
 
   subscribe(handler: (supportRequest: SupportRequest, message: Message) => void): () => void {

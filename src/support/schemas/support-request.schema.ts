@@ -8,7 +8,7 @@ export type SupportRequestDocument = SupportRequest & Document;
 export class SupportRequest extends Document {
   declare _id: Types.ObjectId;
 
-  @Prop({ required: true })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   user: Types.ObjectId;
 
   @Prop({ default: Date.now })

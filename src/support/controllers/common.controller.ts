@@ -25,7 +25,6 @@ export class CommonSupportRequestsController {
   async getMessages(@Param('id') id: string, @Req() req) {
     await this.authorizeAccess(id, req);
     const messages = await this.supportSrv.getMessages(id);
-    // Отдаём массив в требуемом формате (author.name пустой, если не тянем профили)
     return messages.map((m) => mapMessage(m));
   }
 
@@ -38,7 +37,6 @@ export class CommonSupportRequestsController {
       supportRequest: id,
       text: body.text,
     });
-    // По спецификации формат ответа — массив сообщений
     const messages = await this.supportSrv.getMessages(id);
     return messages.map((m) => mapMessage(m));
   }
@@ -62,7 +60,6 @@ export class CommonSupportRequestsController {
     return { success: true };
   }
 
-  // Доступ: client — только к своим SR; manager — ко всем
   private async authorizeAccess(supportRequestId: string, req: any) {
     if (req.user.role === 'manager') return;
     const sr = await this.supportSrv.getByIdOrFail(supportRequestId);
