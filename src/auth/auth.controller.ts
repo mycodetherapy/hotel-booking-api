@@ -1,13 +1,4 @@
-import {
-  Controller,
-  HttpCode,
-  HttpStatus,
-  Post,
-  Request,
-  Session,
-  UnauthorizedException,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, HttpCode, HttpStatus, Post, Request, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { Public } from '../users/decorators/public.decorator';
 import { AuthenticatedGuard } from './session.serializer';
@@ -34,13 +25,24 @@ export class AuthController {
   @UseGuards(AuthenticatedGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  logout(@Request() req, @Session() session: Record<string, any>) {
-    req.logout((err) => {
-      if (err) {
-        throw new UnauthorizedException('Could not log out.');
-      }
+  async logout(@Request() req) {
+    return new Promise((resolve, reject) => {
+      req.logout((err) => {
+        if (err) {
+          return reject(new UnauthorizedException('Could not log out.'));
+        }
+
+        if (req.session) {
+          req.session.destroy((destroyErr) => {
+            if (destroyErr) {
+              return reject(new UnauthorizedException('Could not destroy session.'));
+            }
+            resolve({});
+          });
+        } else {
+          resolve({});
+        }
+      });
     });
-    session.destroy(null);
-    return {};
   }
 }
