@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from '../../../app.module';
-import { TestAuthGuard, TestManagerAuthGuard } from '../../../../test/test-auth.guard';
+import { AppModule } from '../src/app.module';
+import { TestAuthGuard, TestManagerAuthGuard } from './test-auth.guard';
+import { SupportRequestService } from '../src/support/services/support-request.service';
+
 
 describe('SupportRequest Final Test', () => {
   let app: INestApplication;
@@ -33,7 +35,6 @@ describe('SupportRequest Final Test', () => {
     expect(response.body[0]).toHaveProperty('id');
 
     createdRequestId = response.body[0].id;
-    console.log('Created request ID:', createdRequestId);
   });
 
   it('should get support requests list and find created request', async () => {
@@ -44,10 +45,8 @@ describe('SupportRequest Final Test', () => {
     expect(response.status).toBe(200);
     expect(response.body).toBeInstanceOf(Array);
 
-    // Проверяем что созданный запрос есть в списке
     const foundRequest = response.body.find(req => req.id === createdRequestId);
     expect(foundRequest).toBeDefined();
-    console.log('Found in list:', !!foundRequest);
   });
 
   it('should test manager endpoints with manager guard', async () => {
@@ -57,10 +56,6 @@ describe('SupportRequest Final Test', () => {
       .get('/api/manager/support-requests')
       .query({ isActive: 'true' });
 
-    console.log('Manager list status:', response.status);
-    console.log('Manager list body:', response.body);
-
-    // 403 указывает на проблему в authorizeAccess - это ожидаемо для тестов
     expect([200, 403]).toContain(response.status);
 
     app.useGlobalGuards(new TestAuthGuard());
@@ -71,9 +66,6 @@ describe('SupportRequest Final Test', () => {
       .post(`/api/common/support-requests/${createdRequestId}/messages`)
       .send({ text: 'Test message' });
 
-    console.log('Send message status:', response.status);
-    console.log('Send message body:', response.body);
-
     expect([201, 200]).toContain(response.status);
   });
 
@@ -81,30 +73,13 @@ describe('SupportRequest Final Test', () => {
     const response = await request(app.getHttpServer())
       .get(`/api/common/support-requests/${createdRequestId}/messages`);
 
-    console.log('Get messages status:', response.status);
-    console.log('Get messages body:', response.body);
-
     expect(response.status).toBe(200);
     expect(response.body).toBeInstanceOf(Array);
   });
 
-  it('should test service injection from module', async () => {
-    // Сервисы доступны через модуль, а не через app.get()
-    try {
-      const supportModule = (app as any).container.getModules().get('SupportRequestModule');
-      if (supportModule) {
-        const providers = Array.from(supportModule.providers?.keys() || []);
-        console.log('Support module providers:', providers);
-
-        const hasServices = providers.some(provider =>
-          String(provider).includes('SupportRequestService'),
-        );
-        expect(hasServices).toBe(true);
-      }
-    } catch (error) {
-      console.log('Service check error:', error.message);
-      // Пропускаем этот тест
-      expect(true).toBe(true);
-    }
+  it('should inject SupportRequestService from module', async () => {
+    const service = app.get(SupportRequestService);
+    expect(service).toBeDefined();
+    expect(typeof service).toBe('object');
   });
 });

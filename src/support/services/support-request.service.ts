@@ -16,7 +16,9 @@ export class SupportRequestService implements ISupportRequestService {
 
   async findSupportRequests(params: GetChatListParams): Promise<SupportRequest[]> {
     const filter: any = {};
-    if (params.user) filter.user = new Types.ObjectId(params.user);
+    if (params.user) {
+      filter.user = new Types.ObjectId(params.user);
+    }
     if (typeof params.isActive === 'boolean') filter.isActive = params.isActive;
     return this.srModel.find(filter).sort({ createdAt: -1 }).exec();
   }
