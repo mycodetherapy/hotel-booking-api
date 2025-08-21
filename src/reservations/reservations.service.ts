@@ -22,52 +22,61 @@ export class ReservationsService {
   }
 
   async addReservation(userId: ID, roomId: ID, startDate: Date, endDate: Date): Promise<ReservationResponseDto> {
-    const room = await this.hotelRoomsService.findById(roomId.toString());
-    if (!room || !room.isEnabled) {
-      throw new BadRequestException('Room not found or disabled');
+    try {
+      const room = await this.hotelRoomsService.findById(roomId.toString());
+
+      if (!room || !room.isEnabled) {
+        throw new BadRequestException('Room not found or disabled');
+      }
+
+      const isAvailable = await this.isRoomAvailable(roomId, startDate, endDate);
+      if (!isAvailable) {
+        throw new ConflictException('Room is already booked for these dates');
+      }
+
+      const reservation = new this.reservationModel({
+        userId,
+        hotelId: room.hotel._id,
+        roomId,
+        dateStart: startDate,
+        dateEnd: endDate,
+      });
+
+      const saved = await reservation.save();
+
+      const populated = await this.reservationModel
+        .findById(saved._id)
+        .populate([
+          { path: 'roomId', select: 'description images' },
+          { path: 'hotelId', select: 'title description' },
+        ])
+        .lean();
+
+      if (!populated) {
+        throw new NotFoundException('Reservation not found after saving');
+      }
+
+      const response: ReservationResponseDto = {
+        startDate: populated.dateStart,
+        endDate: populated.dateEnd,
+        hotelRoom: {
+          description: (populated.roomId as any)?.description,
+          images: (populated.roomId as any)?.images,
+        },
+        hotel: {
+          title: (populated.hotelId as any)?.title,
+          description: (populated.hotelId as any)?.description,
+        },
+      };
+
+      return response;
+
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new BadRequestException('Room not found or disabled');
+      }
+      throw error;
     }
-
-    const isAvailable = await this.isRoomAvailable(roomId, startDate, endDate);
-    if (!isAvailable) {
-      throw new ConflictException('Room is already booked for these dates');
-    }
-
-    const reservation = new this.reservationModel({
-      userId,
-      hotelId: room.hotel._id,
-      roomId,
-      dateStart: startDate,
-      dateEnd: endDate,
-    });
-
-    const saved = await reservation.save();
-
-    const populated = await this.reservationModel
-      .findById(saved._id)
-      .populate([
-        { path: 'roomId', select: 'description images' },
-        { path: 'hotelId', select: 'title description' },
-      ])
-      .lean();
-
-    if (!populated) {
-      throw new NotFoundException('Reservation not found after saving');
-    }
-
-    const response: ReservationResponseDto = {
-      startDate: populated.dateStart,
-      endDate: populated.dateEnd,
-      hotelRoom: {
-        description: (populated.roomId as any)?.description,
-        images: (populated.roomId as any)?.images,
-      },
-      hotel: {
-        title: (populated.hotelId as any)?.title,
-        description: (populated.hotelId as any)?.description,
-      },
-    };
-
-    return response;
   }
 
   async getReservations(userId: ID) {
