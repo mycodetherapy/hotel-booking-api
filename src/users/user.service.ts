@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
@@ -12,6 +12,10 @@ export class UsersService implements IUserService {
   }
 
   async create(data: Partial<User & { password?: string }>): Promise<User> {
+    const existingUser = await this.UserModel.findOne({ email: data.email });
+    if (existingUser) {
+      throw new BadRequestException('A user with this email already exists');
+    }
     const password = data.password || data.passwordHash;
     if (!password) {
       throw new Error('Password is required');
@@ -45,7 +49,8 @@ export class UsersService implements IUserService {
       query.name = { $regex: name, $options: 'i' };
     }
     if (contactPhone) {
-      query.contactPhone = { $regex: contactPhone, $options: 'i' };
+      const phone = contactPhone.trim().replace(/^ /, '+');
+      query.contactPhone = { $regex: phone, $options: 'i' };
     }
 
     return this.UserModel.find(query)

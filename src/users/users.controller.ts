@@ -37,9 +37,22 @@ export class UsersController {
   }
 
   @UseGuards(AuthenticatedGuard, RolesGuard)
-  @Get(['admin/users', 'manager/users'])
-  @Roles('admin', 'manager')
-  async getUsers(@Query() query: SearchUserParams) {
+  @Get('admin/users')
+  @Roles('admin')
+  async getAdminUsers(@Query() query: SearchUserParams) {
+    const users = await this.usersService.findAll(query);
+    return users.map((u) => ({
+      id: u._id.toString(),
+      email: u.email,
+      name: u.name,
+      contactPhone: u.contactPhone,
+    }));
+  }
+
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Get('manager/users')
+  @Roles('manager')
+  async getManagerUsers(@Query() query: SearchUserParams) {
     const users = await this.usersService.findAll(query);
     return users.map((u) => ({
       id: u._id.toString(),
